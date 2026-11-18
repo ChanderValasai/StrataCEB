@@ -1,6 +1,6 @@
 {
-  "name": "StrataCEB — Compressed Earth Block",
-  "description": "A single-page architectural welcome template for Compressed Earth Block masonry specifications and launch updates.",
+  "name": "Lime Stone — Eco-Earth Block (Mithi, Tharparkar)",
+  "description": "Official web platform and admin console for Lime Stone (Eco-Earth Block), manufacturing interlocking Compressed Stabilized Earth Blocks in Mithi, Tharparkar, Sindh.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
