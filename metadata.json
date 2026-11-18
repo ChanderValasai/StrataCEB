@@ -1,0 +1,8 @@
+{
+  "name": "StrataCEB — Compressed Earth Block",
+  "description": "A single-page architectural welcome template for Compressed Earth Block masonry specifications and launch updates.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
