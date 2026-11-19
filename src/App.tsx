@@ -45,15 +45,51 @@ export default function App() {
     setError(null);
     try {
       const res = await fetch('/api/site-data');
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to load website data.');
+      const rawText = await res.text();
+      let parsed: (PublicSiteBundle & { error?: string }) | null = null;
+
+      if (rawText) {
+        try {
+          parsed = JSON.parse(rawText);
+        } catch {
+          parsed = null;
+        }
       }
-      setSiteData(data);
+
+      if (!res.ok) {
+        const detail =
+          parsed?.error ||
+          rawText
+            .replace(/<[^>]+>/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .slice(0, 220) ||
+          res.statusText ||
+          'Failed to load website data.';
+        const fullMessage = `HTTP ${res.status}${res.statusText ? ` ${res.statusText}` : ''}: ${detail}`;
+        console.error('[Lime Stone] GET /api/site-data failed:', {
+          url: '/api/site-data',
+          status: res.status,
+          statusText: res.statusText,
+          error: detail,
+          body: parsed ?? rawText,
+        });
+        throw new Error(fullMessage);
+      }
+
+      if (!parsed) {
+        const invalidMsg =
+          'HTTP 200: Server returned an empty or non-JSON response for /api/site-data.';
+        console.error('[Lime Stone] Invalid /api/site-data response:', rawText);
+        throw new Error(invalidMsg);
+      }
+
+      setSiteData(parsed);
     } catch (err: unknown) {
-      setError(
-        err instanceof Error ? err.message : 'Unable to reach Lime Stone server.'
-      );
+      const message =
+        err instanceof Error ? err.message : 'Unable to reach Lime Stone server.';
+      console.error('[Lime Stone] Failed to load website data:', err);
+      setError(message);
     } finally {
       setLoading(false);
     }
