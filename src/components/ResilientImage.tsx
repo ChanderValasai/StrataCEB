@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Layers } from 'lucide-react';
 
 interface ResilientImageProps {
@@ -7,6 +7,9 @@ interface ResilientImageProps {
   fallbackTitle: string;
   className?: string;
   containerClassName?: string;
+  loading?: 'eager' | 'lazy';
+  fetchPriority?: 'high' | 'low' | 'auto';
+  decoding?: 'sync' | 'async' | 'auto';
 }
 
 export function ResilientImage({
@@ -15,8 +18,15 @@ export function ResilientImage({
   fallbackTitle,
   className = '',
   containerClassName = '',
+  loading = 'lazy',
+  fetchPriority = 'auto',
+  decoding = 'async',
 }: ResilientImageProps) {
   const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    setHasError(false);
+  }, [src]);
 
   if (hasError) {
     return (
@@ -43,6 +53,9 @@ export function ResilientImage({
       <img
         src={src}
         alt={alt}
+        loading={loading}
+        fetchPriority={fetchPriority}
+        decoding={decoding}
         referrerPolicy="no-referrer"
         onError={() => setHasError(true)}
         className={className}

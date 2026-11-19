@@ -5,7 +5,9 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { AdminDashboard } from './components/AdminDashboard';
+import { EcoEarthStoryPage } from './components/EcoEarthStoryPage';
 import { PublicSite } from './components/PublicSite';
+import { SeoHead } from './components/SeoHead';
 import type { PublicSiteBundle } from './types/limestone';
 
 const EMPTY_BUNDLE: PublicSiteBundle = {
@@ -22,9 +24,17 @@ const EMPTY_BUNDLE: PublicSiteBundle = {
   news: [],
 };
 
+type ViewMode = 'public' | 'story' | 'admin';
+
+function resolveViewModeFromPath(pathname: string): ViewMode {
+  if (pathname.startsWith('/admin')) return 'admin';
+  if (pathname.startsWith('/story')) return 'story';
+  return 'public';
+}
+
 export default function App() {
-  const [viewMode, setViewMode] = useState<'public' | 'admin'>(() =>
-    window.location.pathname.startsWith('/admin') ? 'admin' : 'public'
+  const [viewMode, setViewMode] = useState<ViewMode>(() =>
+    resolveViewModeFromPath(window.location.pathname)
   );
   const [siteData, setSiteData] = useState<PublicSiteBundle>(EMPTY_BUNDLE);
   const [loading, setLoading] = useState<boolean>(true);
@@ -55,39 +65,58 @@ export default function App() {
 
   useEffect(() => {
     const onPopState = () => {
-      setViewMode(
-        window.location.pathname.startsWith('/admin') ? 'admin' : 'public'
-      );
+      setViewMode(resolveViewModeFromPath(window.location.pathname));
     };
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
-  function navigateTo(mode: 'public' | 'admin') {
-    const targetPath = mode === 'admin' ? '/admin' : '/';
+  function navigateTo(mode: ViewMode, sectionId?: string) {
+    const targetPath =
+      mode === 'admin' ? '/admin' : mode === 'story' ? '/story' : '/';
     if (window.location.pathname !== targetPath) {
       window.history.pushState({}, '', targetPath);
     }
     setViewMode(mode);
-    window.scrollTo({ top: 0 });
-  }
 
-  if (viewMode === 'admin') {
-    return (
-      <AdminDashboard
-        onBackToSite={() => navigateTo('public')}
-        onDataUpdated={fetchSiteData}
-      />
-    );
+    if (sectionId) {
+      window.setTimeout(() => {
+        const el = document.getElementById(sectionId);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth' });
+        } else {
+          window.scrollTo({ top: 0 });
+        }
+      }, 60);
+    } else {
+      window.scrollTo({ top: 0 });
+    }
   }
 
   return (
-    <PublicSite
-      data={siteData}
-      loading={loading}
-      error={error}
-      onRetry={fetchSiteData}
-      onOpenAdmin={() => navigateTo('admin')}
-    />
+    <>
+      <SeoHead viewMode={viewMode} siteData={siteData} />
+      {viewMode === 'admin' ? (
+        <AdminDashboard
+          onBackToSite={() => navigateTo('public')}
+          onDataUpdated={fetchSiteData}
+        />
+      ) : viewMode === 'story' ? (
+        <EcoEarthStoryPage
+          settings={siteData.settings}
+          onBackToAbout={() => navigateTo('public', 'about')}
+          onGoToInquiry={() => navigateTo('public', 'contact')}
+        />
+      ) : (
+        <PublicSite
+          data={siteData}
+          loading={loading}
+          error={error}
+          onRetry={fetchSiteData}
+          onOpenAdmin={() => navigateTo('admin')}
+          onOpenStory={() => navigateTo('story')}
+        />
+      )}
+    </>
   );
 }

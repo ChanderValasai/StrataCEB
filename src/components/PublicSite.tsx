@@ -7,7 +7,9 @@ import {
   ExternalLink,
   FileText,
   Lock,
+  Mail,
   Menu,
+  Phone,
   X,
 } from 'lucide-react';
 import type { GalleryItem, PublicSiteBundle } from '../types/limestone';
@@ -19,6 +21,7 @@ interface PublicSiteProps {
   error: string | null;
   onRetry: () => void;
   onOpenAdmin: () => void;
+  onOpenStory: () => void;
 }
 
 const WALL_BLOCK_PHOTOS = [
@@ -141,6 +144,7 @@ export function PublicSite({
   error,
   onRetry,
   onOpenAdmin,
+  onOpenStory,
 }: PublicSiteProps) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [heroPhotoIdx, setHeroPhotoIdx] = useState<number>(0);
@@ -489,6 +493,9 @@ export function PublicSite({
                 src={(HERO_PHOTOS[heroPhotoIdx] ?? HERO_PHOTOS[0]).src}
                 alt={(HERO_PHOTOS[heroPhotoIdx] ?? HERO_PHOTOS[0]).label}
                 fallbackTitle="Lime Stone Eco-Earth Blocks"
+                loading="eager"
+                fetchPriority="high"
+                decoding="sync"
                 containerClassName="flex-1 min-h-[280px] sm:min-h-[340px]"
                 className="h-full w-full object-cover"
               />
@@ -511,6 +518,8 @@ export function PublicSite({
                       <img
                         src={photo.src}
                         alt={photo.label}
+                        loading="lazy"
+                        decoding="async"
                         referrerPolicy="no-referrer"
                         className="aspect-[4/3] w-full object-cover"
                       />
@@ -598,6 +607,57 @@ export function PublicSite({
                     <span className="font-medium text-[#141716]">Workforce:</span>{' '}
                     {settings?.teamSize}
                   </p>
+                </div>
+
+                {/* Project Lead Profile Card */}
+                <div className="mt-6 flex items-center gap-4 rounded-xl border border-[#DCE0DB] bg-[#F6F7F6] p-4">
+                  <img
+                    src="/assets/aistudio/ganpatProfile_a980c522.jpg"
+                    alt={`${settings?.projectLead ?? 'Ganpat Meghwar'} — Founder & Project Lead, Lime Stone (Eco-Earth Block)`}
+                    loading="lazy"
+                    decoding="async"
+                    referrerPolicy="no-referrer"
+                    className="h-20 w-20 shrink-0 rounded-lg border border-[#DCE0DB] object-cover object-top"
+                  />
+                  <div className="min-w-0 space-y-1">
+                    <p className="font-display text-base font-semibold text-[#141716]">
+                      {settings?.projectLead ?? 'Ganpat Meghwar'}
+                    </p>
+                    <p className="text-xs text-[#4F5652]">
+                      Founder &amp; Project Lead · BBA, Sukkur IBA University
+                    </p>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 pt-1 text-xs">
+                      <a
+                        href={`mailto:${settings?.contactEmail ?? 'raiganpat401@gmail.com'}`}
+                        className="inline-flex items-center gap-1 font-mono text-[#1B4D3E] hover:underline"
+                      >
+                        <Mail className="h-3 w-3 shrink-0" aria-hidden="true" />
+                        <span>{settings?.contactEmail ?? 'raiganpat401@gmail.com'}</span>
+                      </a>
+                      <a
+                        href={`tel:${(settings?.contactPhone ?? '+923212472380').replace(/\s+/g, '')}`}
+                        className="inline-flex items-center gap-1 font-mono text-[#1B4D3E] hover:underline"
+                      >
+                        <Phone className="h-3 w-3 shrink-0" aria-hidden="true" />
+                        <span>{settings?.contactPhone ?? '+923212472380'}</span>
+                      </a>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Connected Story / Hidden Blog Page Link */}
+                <div className="mt-5">
+                  <a
+                    href="/story"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      onOpenStory();
+                    }}
+                    className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-[#1B4D3E] bg-white px-4 py-2.5 text-sm font-medium text-[#1B4D3E] transition-colors hover:bg-[#1B4D3E] hover:text-white"
+                  >
+                    <span>Read Full Story: The Story of Eco-Earth</span>
+                    <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                  </a>
                 </div>
               </div>
 
@@ -763,6 +823,8 @@ export function PublicSite({
                               <img
                                 src={photo.src}
                                 alt={photo.label}
+                                loading="lazy"
+                                decoding="async"
                                 referrerPolicy="no-referrer"
                                 className="aspect-[4/3] w-full object-cover"
                               />
@@ -1481,13 +1543,23 @@ export function PublicSite({
                   <div>
                     <dt className="text-xs text-[#555D58]">Email</dt>
                     <dd className="mt-0.5 font-mono text-[#141716]">
-                      {settings?.contactEmail}
+                      <a
+                        href={`mailto:${settings?.contactEmail ?? 'raiganpat401@gmail.com'}`}
+                        className="hover:text-[#1B4D3E] hover:underline"
+                      >
+                        {settings?.contactEmail ?? 'raiganpat401@gmail.com'}
+                      </a>
                     </dd>
                   </div>
                   <div>
                     <dt className="text-xs text-[#555D58]">Phone</dt>
                     <dd className="mt-0.5 font-mono text-[#141716]">
-                      {settings?.contactPhone}
+                      <a
+                        href={`tel:${(settings?.contactPhone ?? '+923212472380').replace(/\s+/g, '')}`}
+                        className="hover:text-[#1B4D3E] hover:underline"
+                      >
+                        {settings?.contactPhone ?? '+923212472380'}
+                      </a>
                     </dd>
                   </div>
                 </dl>
@@ -1753,6 +1825,7 @@ export function PublicSite({
             <img
               src={lightboxItem.imageUrl}
               alt={lightboxItem.title}
+              decoding="async"
               referrerPolicy="no-referrer"
               className="max-h-[70vh] w-full object-cover"
             />

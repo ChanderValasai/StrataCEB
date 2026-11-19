@@ -29,6 +29,7 @@ import {
   updateProjectRecord,
   updateSiteSettingsRecord,
 } from './src/db/queries.ts';
+import { buildJsonLdGraph, buildSeoMetadata, SEO_DEFAULTS } from './src/lib/seo.ts';
 import { updateUserRole } from './src/db/users.ts';
 import { AuthRequest, requireAdminRole, requireAuth } from './src/middleware/auth.ts';
 
@@ -36,7 +37,144 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+app.set('trust proxy', 1);
 app.use(express.json({ limit: '1mb' }));
+
+// Security and crawlability headers
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  if (
+    req.path.startsWith('/assets/aistudio/') ||
+    req.path === '/favicon.svg'
+  ) {
+    res.setHeader('Cache-Control', 'public, max-age=604800, stale-while-revalidate=86400');
+  }
+  next();
+});
+
+function resolveBaseUrl(req: express.Request): string {
+  const configured = process.env.APP_URL?.trim();
+  if (configured) {
+    return configured.replace(/\/+$/, '');
+  }
+  const forwardedProto = req.get('x-forwarded-proto')?.split(',')[0]?.trim();
+  const protocol = forwardedProto || req.protocol || 'https';
+  const host = req.get('x-forwarded-host') || req.get('host') || 'localhost:3000';
+  return `${protocol}://${host}`.replace(/\/+$/, '');
+}
+
+function escapeHtmlAttr(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+async function injectSeoIntoHtml(
+  rawHtml: string,
+  req: express.Request
+): Promise<string> {
+  const baseUrl = resolveBaseUrl(req);
+  const pathname = req.path || '/';
+  let bundle = null;
+  try {
+    bundle = await getPublicSiteBundle();
+  } catch {
+    bundle = null;
+  }
+
+  const meta = buildSeoMetadata(baseUrl, pathname, bundle);
+  const escapedTitle = escapeHtmlAttr(meta.title);
+  const escapedDesc = escapeHtmlAttr(meta.description);
+  const escapedUrl = escapeHtmlAttr(meta.canonicalUrl);
+  const escapedImage = escapeHtmlAttr(meta.ogImage);
+  const escapedImageAlt = escapeHtmlAttr(meta.ogImageAlt);
+  const escapedSiteName = escapeHtmlAttr(meta.siteName);
+  const escapedRobots = escapeHtmlAttr(meta.robots);
+
+  let html = rawHtml
+    .replace(/<title>[\s\S]*?<\/title>/i, `<title>${escapedTitle}</title>`)
+    .replace(
+      /<meta\s+name="description"[^>]*>/i,
+      `<meta name="description" content="${escapedDesc}" />`
+    )
+    .replace(
+      /<meta\s+name="robots"[^>]*>/i,
+      `<meta name="robots" content="${escapedRobots}" />`
+    )
+    .replace(
+      /<meta\s+name="googlebot"[^>]*>/i,
+      `<meta name="googlebot" content="${escapedRobots}" />`
+    )
+    .replace(
+      /(?:<link\s+rel="canonical"[^>]*>|<!--\s*SEO_CANONICAL_LINK\s*-->)/i,
+      `<link rel="canonical" href="${escapedUrl}" />`
+    )
+    .replace(
+      /<meta\s+property="og:type"[^>]*>/i,
+      `<meta property="og:type" content="${escapeHtmlAttr(meta.ogType)}" />`
+    )
+    .replace(
+      /<meta\s+property="og:site_name"[^>]*>/i,
+      `<meta property="og:site_name" content="${escapedSiteName}" />`
+    )
+    .replace(
+      /<meta\s+property="og:title"[^>]*>/i,
+      `<meta property="og:title" content="${escapedTitle}" />`
+    )
+    .replace(
+      /<meta\s+property="og:description"[^>]*>/i,
+      `<meta property="og:description" content="${escapedDesc}" />`
+    )
+    .replace(
+      /<meta\s+property="og:url"[^>]*>/i,
+      `<meta property="og:url" content="${escapedUrl}" />`
+    )
+    .replace(
+      /<meta\s+property="og:image"[^>]*>/i,
+      `<meta property="og:image" content="${escapedImage}" />`
+    )
+    .replace(
+      /<meta\s+property="og:image:alt"[^>]*>/i,
+      `<meta property="og:image:alt" content="${escapedImageAlt}" />`
+    )
+    .replace(
+      /<meta\s+name="twitter:title"[^>]*>/i,
+      `<meta name="twitter:title" content="${escapedTitle}" />`
+    )
+    .replace(
+      /<meta\s+name="twitter:description"[^>]*>/i,
+      `<meta name="twitter:description" content="${escapedDesc}" />`
+    )
+    .replace(
+      /<meta\s+name="twitter:image"[^>]*>/i,
+      `<meta name="twitter:image" content="${escapedImage}" />`
+    )
+    .replace(
+      /<meta\s+name="twitter:image:alt"[^>]*>/i,
+      `<meta name="twitter:image:alt" content="${escapedImageAlt}" />`
+    );
+
+  if (meta.isAdmin) {
+    html = html.replace(
+      /<script\s+id="limestone-jsonld"[^>]*>[\s\S]*?<\/script>/i,
+      ''
+    );
+  } else {
+    const jsonLd = JSON.stringify(buildJsonLdGraph(baseUrl, bundle)).replace(
+      /<\/script>/gi,
+      '<\\/script>'
+    );
+    html = html.replace(
+      /<script\s+id="limestone-jsonld"[^>]*>[\s\S]*?<\/script>/i,
+      `<script id="limestone-jsonld" type="application/ld+json">${jsonLd}</script>`
+    );
+  }
+
+  return html;
+}
 
 // Simple in-memory IP rate limiter for public inquiry submission
 const inquiryHits = new Map<string, number[]>();
@@ -69,6 +207,73 @@ function slugify(value: string): string {
 // Health endpoint
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok' });
+});
+
+// Search Engine Crawl Directives
+app.get('/robots.txt', (req, res) => {
+  const baseUrl = resolveBaseUrl(req);
+  res.type('text/plain').send(
+    [
+      'User-agent: *',
+      'Allow: /',
+      'Disallow: /admin',
+      'Disallow: /api/admin/',
+      '',
+      `Sitemap: ${baseUrl}/sitemap.xml`,
+    ].join('\n')
+  );
+});
+
+// Dynamic XML Sitemap
+app.get('/sitemap.xml', async (req, res) => {
+  const baseUrl = resolveBaseUrl(req);
+  let lastMod = new Date().toISOString().slice(0, 10);
+  try {
+    const bundle = await getPublicSiteBundle();
+    const latestNewsDate = bundle.news[0]?.publishedAt;
+    if (latestNewsDate && /^\d{4}-\d{2}-\d{2}$/.test(latestNewsDate)) {
+      lastMod = latestNewsDate;
+    }
+  } catch {
+    // Use current date fallback if DB query is unavailable
+  }
+
+  const urls = [
+    {
+      loc: `${baseUrl}/`,
+      lastmod: lastMod,
+      changefreq: 'weekly',
+      priority: '1.0',
+    },
+    {
+      loc: `${baseUrl}/story`,
+      lastmod: lastMod,
+      changefreq: 'monthly',
+      priority: '0.8',
+    },
+    {
+      loc: `${baseUrl}${SEO_DEFAULTS.conceptNotePath}`,
+      lastmod: lastMod,
+      changefreq: 'monthly',
+      priority: '0.7',
+    },
+  ];
+
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${urls
+  .map(
+    (entry) => `  <url>
+    <loc>${escapeHtmlAttr(entry.loc)}</loc>
+    <lastmod>${entry.lastmod}</lastmod>
+    <changefreq>${entry.changefreq}</changefreq>
+    <priority>${entry.priority}</priority>
+  </url>`
+  )
+  .join('\n')}
+</urlset>`;
+
+  res.type('application/xml').send(xml);
 });
 
 // Public site data
@@ -740,17 +945,43 @@ async function startServer() {
       server: { middlewareMode: true },
       appType: 'spa',
     });
+
+    app.get(['/', '/story', '/story/*', '/admin', '/admin/*'], async (req, res, next) => {
+      try {
+        const indexPath = path.resolve(__dirname, 'index.html');
+        const template = await fs.promises.readFile(indexPath, 'utf-8');
+        const transformed = await vite.transformIndexHtml(req.originalUrl, template);
+        const seoHtml = await injectSeoIntoHtml(transformed, req);
+        res.status(200).set({ 'Content-Type': 'text/html' }).end(seoHtml);
+      } catch (e) {
+        vite.ssrFixStacktrace(e as Error);
+        next(e);
+      }
+    });
+
     app.use(vite.middlewares);
   } else {
     const distDir = path.resolve(__dirname, 'dist');
-    app.use(express.static(distDir));
-    app.get('*', (req, res, next) => {
+    app.use(
+      express.static(distDir, {
+        index: false,
+        maxAge: '7d',
+        setHeaders(res, filePath) {
+          if (filePath.endsWith('.html')) {
+            res.setHeader('Cache-Control', 'no-cache');
+          }
+        },
+      })
+    );
+    app.get('*', async (req, res, next) => {
       if (req.path.startsWith('/api/')) {
         return next();
       }
       const indexFile = path.join(distDir, 'index.html');
       if (fs.existsSync(indexFile)) {
-        res.sendFile(indexFile);
+        const template = await fs.promises.readFile(indexFile, 'utf-8');
+        const seoHtml = await injectSeoIntoHtml(template, req);
+        res.status(200).set({ 'Content-Type': 'text/html' }).send(seoHtml);
       } else {
         res.status(404).send('Build output not found.');
       }
