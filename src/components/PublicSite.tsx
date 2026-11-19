@@ -330,12 +330,21 @@ export function PublicSite({
       {/* Top Bar: Strict 3-Zone Contract */}
       <header className="sticky top-0 z-30 border-b border-[#E1E4E0] bg-[#F6F7F6]/95 backdrop-blur-sm">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-8 px-6 py-4 lg:px-10">
-          {/* Zone 1: Single-line Wordmark */}
+          {/* Zone 1: Single-line Wordmark + Logo */}
           <a
             href="#home"
-            className="font-display text-xl font-bold tracking-tight text-[#141716] whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#1B4D3E]"
+            className="inline-flex items-center gap-2.5 font-display text-xl font-bold tracking-tight text-[#141716] whitespace-nowrap shrink-0 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#1B4D3E]"
           >
-            Lime Stone
+            <span className="h-9 w-9 overflow-hidden rounded-lg border border-[#DCE0DB] bg-[#E7EAE6] shrink-0">
+              <img
+                src="/assets/aistudio/image_f0f2901d.png"
+                alt="Lime Stone Eco-Earth Block logo"
+                decoding="sync"
+                referrerPolicy="no-referrer"
+                className="h-full w-full scale-110 object-cover"
+              />
+            </span>
+            <span>Lime Stone</span>
           </a>
 
           {/* Zone 2: 5 Single-line Nav Links */}
@@ -1853,17 +1862,29 @@ export function PublicSite({
       {/* Quiet Footer */}
       <footer className="border-t border-[#E1E4E0] bg-[#F6F7F6] py-10">
         <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-6 px-6 sm:flex-row sm:items-center lg:px-10">
-          <div className="space-y-1 text-sm text-[#555D58]">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="font-display font-semibold text-[#141716]">
-                Lime Stone (Eco-Earth Block)
-              </span>
-              <span aria-hidden="true">·</span>
-              <span>{settings?.plantLocation}</span>
+          <div className="flex items-center gap-3 text-sm text-[#555D58]">
+            <span className="h-9 w-9 overflow-hidden rounded-lg border border-[#DCE0DB] bg-[#E7EAE6] shrink-0">
+              <img
+                src="/assets/aistudio/image_f0f2901d.png"
+                alt="Lime Stone Eco-Earth Block logo"
+                loading="lazy"
+                decoding="async"
+                referrerPolicy="no-referrer"
+                className="h-full w-full scale-110 object-cover"
+              />
+            </span>
+            <div className="space-y-0.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-display font-semibold text-[#141716]">
+                  Lime Stone (Eco-Earth Block)
+                </span>
+                <span aria-hidden="true">·</span>
+                <span>{settings?.plantLocation}</span>
+              </div>
+              <p className="text-xs">
+                Lime-cement stabilized compressed earth blocks (not natural limestone).
+              </p>
             </div>
-            <p className="text-xs">
-              Lime-cement stabilized compressed earth blocks (not natural limestone).
-            </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-6 text-sm text-[#555D58]">

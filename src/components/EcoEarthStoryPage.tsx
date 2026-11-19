@@ -47,9 +47,18 @@ export function EcoEarthStoryPage({
           <button
             type="button"
             onClick={onBackToAbout}
-            className="inline-flex min-h-10 items-center gap-2 text-sm font-medium text-[#141716] hover:text-[#1B4D3E] cursor-pointer"
+            className="inline-flex min-h-10 items-center gap-2.5 text-sm font-medium text-[#141716] hover:text-[#1B4D3E] cursor-pointer"
           >
-            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+            <span className="h-8 w-8 overflow-hidden rounded-lg border border-[#DCE0DB] bg-[#E7EAE6] shrink-0">
+              <img
+                src="/assets/aistudio/image_f0f2901d.png"
+                alt="Lime Stone logo"
+                decoding="sync"
+                referrerPolicy="no-referrer"
+                className="h-full w-full scale-110 object-cover"
+              />
+            </span>
+            <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden="true" />
             <span>Back to About Lime Stone &amp; Sustainability</span>
           </button>
 

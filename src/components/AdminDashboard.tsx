@@ -477,9 +477,20 @@ export function AdminDashboard({
       <div className="flex min-h-screen flex-col items-center justify-center bg-[#F6F7F6] px-6 py-12">
         <div className="w-full max-w-md rounded-xl border border-[#DCE0DB] bg-white p-8">
           <div className="flex items-center justify-between">
-            <span className="font-display text-xl font-bold text-[#141716]">
-              Lime Stone Admin
-            </span>
+            <div className="flex items-center gap-2.5">
+              <span className="h-8 w-8 overflow-hidden rounded-lg border border-[#DCE0DB] bg-[#E7EAE6] shrink-0">
+                <img
+                  src="/assets/aistudio/image_f0f2901d.png"
+                  alt="Lime Stone logo"
+                  decoding="sync"
+                  referrerPolicy="no-referrer"
+                  className="h-full w-full scale-110 object-cover"
+                />
+              </span>
+              <span className="font-display text-xl font-bold text-[#141716]">
+                Lime Stone Admin
+              </span>
+            </div>
             <button
               type="button"
               onClick={onBackToSite}
@@ -554,13 +565,24 @@ export function AdminDashboard({
     <div className="flex min-h-screen bg-[#F6F7F6] text-[#141716]">
       {/* Fixed Desktop Sidebar */}
       <aside className="hidden w-64 shrink-0 flex-col border-r border-[#E1E4E0] bg-white lg:flex">
-        <div className="border-b border-[#E1E4E0] px-6 py-5">
-          <span className="font-display text-lg font-bold tracking-tight text-[#141716]">
-            Lime Stone
+        <div className="flex items-center gap-3 border-b border-[#E1E4E0] px-6 py-5">
+          <span className="h-9 w-9 overflow-hidden rounded-lg border border-[#DCE0DB] bg-[#E7EAE6] shrink-0">
+            <img
+              src="/assets/aistudio/image_f0f2901d.png"
+              alt="Lime Stone logo"
+              decoding="sync"
+              referrerPolicy="no-referrer"
+              className="h-full w-full scale-110 object-cover"
+            />
           </span>
-          <p className="mt-0.5 text-xs text-[#555D58]">
-            Plant &amp; Content Console
-          </p>
+          <div>
+            <span className="font-display text-lg font-bold tracking-tight text-[#141716]">
+              Lime Stone
+            </span>
+            <p className="mt-0.5 text-xs text-[#555D58]">
+              Plant &amp; Content Console
+            </p>
+          </div>
         </div>
 
         <nav aria-label="Admin Navigation" className="flex-1 space-y-1 p-3">
