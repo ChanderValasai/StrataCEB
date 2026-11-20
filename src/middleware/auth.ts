@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from 'express';
 import { DecodedIdToken } from 'firebase-admin/auth';
-import { adminAuth } from '../lib/firebase-admin.ts';
+import { getAdminAuth } from '../lib/firebase-admin.ts';
 import { getOrCreateUser } from '../db/users.ts';
 
 export interface AuthRequest extends Request {
@@ -26,7 +26,7 @@ export const requireAuth = async (
 
   const token = authHeader.split('Bearer ')[1];
   try {
-    const decodedToken = await adminAuth.verifyIdToken(token);
+    const decodedToken = await getAdminAuth().verifyIdToken(token);
     req.user = decodedToken;
 
     const dbUser = await getOrCreateUser(

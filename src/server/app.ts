@@ -1,6 +1,8 @@
-import 'dotenv/config';
 import express from 'express';
-import { assertDatabaseConfigured } from '../db/index.ts';
+import {
+  assertDatabaseConfigured,
+  checkDatabaseHealth,
+} from '../db/index.ts';
 import {
   createFaqRecord,
   createGalleryRecord,
@@ -76,13 +78,25 @@ function escapeHtmlAttr(value: string): string {
 
 function formatApiError(error: unknown, fallback: string): string {
   if (!(error instanceof Error)) {
-    return fallback;
+    return typeof error === 'string' && error.trim() ? error : fallback;
   }
-  const cause = (error as Error & { cause?: unknown }).cause;
+  const pgErr = error as Error & {
+    code?: string;
+    detail?: string;
+    cause?: unknown;
+  };
+  const cause = pgErr.cause;
+  const parts: string[] = [error.message || fallback];
+
   if (cause instanceof Error && cause.message && cause.message !== error.message) {
-    return `${error.message} (${cause.message})`;
+    const causePg = cause as Error & { code?: string; detail?: string };
+    const codeTag = causePg.code ? ` [${causePg.code}]` : '';
+    parts.push(`${cause.message}${codeTag}`);
+  } else if (pgErr.code) {
+    parts.push(`[${pgErr.code}]`);
   }
-  return error.message || fallback;
+
+  return parts.join(' — ');
 }
 
 export async function injectSeoIntoHtml(
@@ -218,68 +232,108 @@ function slugify(value: string): string {
   return `${base || 'item'}-${Date.now().toString(36)}`;
 }
 
-// Health endpoint
-app.get('/api/health', (_req, res) => {
+// Health endpoint with live PostgreSQL and schema check
+app.get('/api/health', async (_req, res) => {
   const mode = process.env.DATABASE_URL
     ? 'database_url'
     : process.env.SQL_HOST
       ? 'cloudsql_env'
       : 'unconfigured';
-  res.json({ status: 'ok', databaseMode: mode });
+
+  try {
+    const health = await checkDatabaseHealth();
+    if (!health.connected || !health.schemaReady) {
+      const message =
+        health.error ||
+        (!health.schemaReady
+          ? 'Connected to PostgreSQL, but database schema tables (e.g. site_settings) are missing. Run db/schema_and_seed.sql.'
+          : 'Database health check failed.');
+      console.error('GET /api/health failed:', message);
+      return res.status(500).json({
+        status: 'error',
+        databaseMode: mode,
+        databaseConnected: health.connected,
+        schemaReady: health.schemaReady,
+        error: message,
+      });
+    }
+
+    return res.json({
+      status: 'ok',
+      databaseMode: mode,
+      databaseConnected: true,
+      schemaReady: true,
+    });
+  } catch (error: unknown) {
+    console.error('GET /api/health unexpected error:', error);
+    return res.status(500).json({
+      status: 'error',
+      databaseMode: mode,
+      databaseConnected: false,
+      schemaReady: false,
+      error: formatApiError(error, 'Database health check failed.'),
+    });
+  }
 });
 
 // Search Engine Crawl Directives
 app.get('/robots.txt', (req, res) => {
-  const baseUrl = resolveBaseUrl(req);
-  res.type('text/plain').send(
-    [
-      'User-agent: *',
-      'Allow: /',
-      'Disallow: /admin',
-      'Disallow: /api/admin/',
-      '',
-      `Sitemap: ${baseUrl}/sitemap.xml`,
-    ].join('\n')
-  );
+  try {
+    const baseUrl = resolveBaseUrl(req);
+    res.type('text/plain').send(
+      [
+        'User-agent: *',
+        'Allow: /',
+        'Disallow: /admin',
+        'Disallow: /api/admin/',
+        '',
+        `Sitemap: ${baseUrl}/sitemap.xml`,
+      ].join('\n')
+    );
+  } catch (error: unknown) {
+    console.error('GET /robots.txt error:', error);
+    res.status(500).type('text/plain').send('User-agent: *\nAllow: /');
+  }
 });
 
 // Dynamic XML Sitemap
 app.get('/sitemap.xml', async (req, res) => {
-  const baseUrl = resolveBaseUrl(req);
-  let lastMod = new Date().toISOString().slice(0, 10);
   try {
-    assertDatabaseConfigured();
-    const bundle = await getPublicSiteBundle();
-    const latestNewsDate = bundle.news[0]?.publishedAt;
-    if (latestNewsDate && /^\d{4}-\d{2}-\d{2}$/.test(latestNewsDate)) {
-      lastMod = latestNewsDate;
+    const baseUrl = resolveBaseUrl(req);
+    let lastMod = new Date().toISOString().slice(0, 10);
+    try {
+      assertDatabaseConfigured();
+      const bundle = await getPublicSiteBundle();
+      const latestNewsDate = bundle.news[0]?.publishedAt;
+      if (latestNewsDate && /^\d{4}-\d{2}-\d{2}$/.test(latestNewsDate)) {
+        lastMod = latestNewsDate;
+      }
+    } catch (error: unknown) {
+      console.error('GET /sitemap.xml database fallback warning:', error);
     }
-  } catch {
-    // Use current date fallback if DB query is unavailable
-  }
 
-  const urls = [
-    {
-      loc: `${baseUrl}/`,
-      lastmod: lastMod,
-      changefreq: 'weekly',
-      priority: '1.0',
-    },
-    {
-      loc: `${baseUrl}/story`,
-      lastmod: lastMod,
-      changefreq: 'monthly',
-      priority: '0.8',
-    },
-    {
-      loc: `${baseUrl}${SEO_DEFAULTS.conceptNotePath}`,
-      lastmod: lastMod,
-      changefreq: 'monthly',
-      priority: '0.7',
-    },
-  ];
+    const urls = [
+      {
+        loc: `${baseUrl}/`,
+        lastmod: lastMod,
+        changefreq: 'weekly',
+        priority: '1.0',
+      },
+      {
+        loc: `${baseUrl}/story`,
+        lastmod: lastMod,
+        changefreq: 'monthly',
+        priority: '0.8',
+      },
+      {
+        loc: `${baseUrl}${SEO_DEFAULTS.conceptNotePath}`,
+        lastmod: lastMod,
+        changefreq: 'monthly',
+        priority: '0.7',
+      },
+    ];
 
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${urls
   .map(
@@ -293,7 +347,13 @@ ${urls
   .join('\n')}
 </urlset>`;
 
-  res.type('application/xml').send(xml);
+    res.type('application/xml').send(xml);
+  } catch (error: unknown) {
+    console.error('GET /sitemap.xml error:', error);
+    res.status(500).json({
+      error: formatApiError(error, 'Failed to generate sitemap.'),
+    });
+  }
 });
 
 // Public site data
@@ -390,6 +450,7 @@ app.get('/api/admin/overview', requireAuth, async (req: AuthRequest, res) => {
     const data = await getAdminOverviewBundle(isAdmin);
     res.json({ ...data, currentUser: req.dbUser });
   } catch (error: unknown) {
+    console.error('GET /api/admin/overview error:', error);
     res.status(500).json({
       error: formatApiError(error, 'Unable to load dashboard data.'),
     });
@@ -433,6 +494,7 @@ app.post('/api/admin/products', requireAuth, async (req: AuthRequest, res) => {
     });
     res.status(201).json(created);
   } catch (error: unknown) {
+    console.error('POST /api/admin/products error:', error);
     res.status(500).json({
       error: formatApiError(error, 'Failed to create product.'),
     });
@@ -470,6 +532,7 @@ app.patch('/api/admin/products/:id', requireAuth, async (req: AuthRequest, res) 
     }
     res.json(updated);
   } catch (error: unknown) {
+    console.error('PATCH /api/admin/products/:id error:', error);
     res.status(500).json({
       error: formatApiError(error, 'Failed to update product.'),
     });
@@ -488,6 +551,7 @@ app.delete('/api/admin/products/:id', requireAuth, async (req: AuthRequest, res)
     }
     res.json({ deleted: true, id });
   } catch (error: unknown) {
+    console.error('DELETE /api/admin/products/:id error:', error);
     res.status(500).json({
       error: formatApiError(error, 'Failed to delete product.'),
     });
@@ -522,6 +586,7 @@ app.post('/api/admin/lab-reports', requireAuth, async (req: AuthRequest, res) =>
     });
     res.status(201).json(created);
   } catch (error: unknown) {
+    console.error('POST /api/admin/lab-reports error:', error);
     res.status(500).json({
       error: formatApiError(error, 'Failed to create lab report.'),
     });
@@ -556,6 +621,7 @@ app.patch(
       }
       res.json(updated);
     } catch (error: unknown) {
+      console.error('PATCH /api/admin/lab-reports/:id error:', error);
       res.status(500).json({
         error: formatApiError(error, 'Failed to update lab report.'),
       });
@@ -578,6 +644,7 @@ app.delete(
       }
       res.json({ deleted: true, id });
     } catch (error: unknown) {
+      console.error('DELETE /api/admin/lab-reports/:id error:', error);
       res.status(500).json({
         error: formatApiError(error, 'Failed to delete lab report.'),
       });
@@ -610,6 +677,7 @@ app.post('/api/admin/projects', requireAuth, async (req: AuthRequest, res) => {
     });
     res.status(201).json(created);
   } catch (error: unknown) {
+    console.error('POST /api/admin/projects error:', error);
     res.status(500).json({
       error: formatApiError(error, 'Failed to create project.'),
     });
@@ -633,6 +701,7 @@ app.patch('/api/admin/projects/:id', requireAuth, async (req: AuthRequest, res) 
     }
     res.json(updated);
   } catch (error: unknown) {
+    console.error('PATCH /api/admin/projects/:id error:', error);
     res.status(500).json({
       error: formatApiError(error, 'Failed to update project.'),
     });
@@ -651,6 +720,7 @@ app.delete('/api/admin/projects/:id', requireAuth, async (req: AuthRequest, res)
     }
     res.json({ deleted: true, id });
   } catch (error: unknown) {
+    console.error('DELETE /api/admin/projects/:id error:', error);
     res.status(500).json({
       error: formatApiError(error, 'Failed to delete project.'),
     });
@@ -677,6 +747,7 @@ app.post('/api/admin/gallery', requireAuth, async (req: AuthRequest, res) => {
     });
     res.status(201).json(created);
   } catch (error: unknown) {
+    console.error('POST /api/admin/gallery error:', error);
     res.status(500).json({
       error: formatApiError(error, 'Failed to create gallery item.'),
     });
@@ -695,6 +766,7 @@ app.delete('/api/admin/gallery/:id', requireAuth, async (req: AuthRequest, res) 
     }
     res.json({ deleted: true, id });
   } catch (error: unknown) {
+    console.error('DELETE /api/admin/gallery/:id error:', error);
     res.status(500).json({
       error: formatApiError(error, 'Failed to delete gallery item.'),
     });
@@ -719,6 +791,7 @@ app.post('/api/admin/faqs', requireAuth, async (req: AuthRequest, res) => {
     });
     res.status(201).json(created);
   } catch (error: unknown) {
+    console.error('POST /api/admin/faqs error:', error);
     res.status(500).json({
       error: formatApiError(error, 'Failed to create FAQ.'),
     });
@@ -743,6 +816,7 @@ app.patch('/api/admin/faqs/:id', requireAuth, async (req: AuthRequest, res) => {
     }
     res.json(updated);
   } catch (error: unknown) {
+    console.error('PATCH /api/admin/faqs/:id error:', error);
     res.status(500).json({
       error: formatApiError(error, 'Failed to update FAQ.'),
     });
@@ -761,6 +835,7 @@ app.delete('/api/admin/faqs/:id', requireAuth, async (req: AuthRequest, res) => 
     }
     res.json({ deleted: true, id });
   } catch (error: unknown) {
+    console.error('DELETE /api/admin/faqs/:id error:', error);
     res.status(500).json({
       error: formatApiError(error, 'Failed to delete FAQ.'),
     });
@@ -792,6 +867,7 @@ app.post('/api/admin/news', requireAuth, async (req: AuthRequest, res) => {
     });
     res.status(201).json(created);
   } catch (error: unknown) {
+    console.error('POST /api/admin/news error:', error);
     res.status(500).json({
       error: formatApiError(error, 'Failed to publish news.'),
     });
@@ -814,6 +890,7 @@ app.patch('/api/admin/news/:id', requireAuth, async (req: AuthRequest, res) => {
     }
     res.json(updated);
   } catch (error: unknown) {
+    console.error('PATCH /api/admin/news/:id error:', error);
     res.status(500).json({
       error: formatApiError(error, 'Failed to update news item.'),
     });
@@ -832,6 +909,7 @@ app.delete('/api/admin/news/:id', requireAuth, async (req: AuthRequest, res) => 
     }
     res.json({ deleted: true, id });
   } catch (error: unknown) {
+    console.error('DELETE /api/admin/news/:id error:', error);
     res.status(500).json({
       error: formatApiError(error, 'Failed to delete news item.'),
     });
@@ -856,6 +934,7 @@ app.patch('/api/admin/inquiries/:id', requireAuth, async (req: AuthRequest, res)
     }
     res.json(updated);
   } catch (error: unknown) {
+    console.error('PATCH /api/admin/inquiries/:id error:', error);
     res.status(500).json({
       error: formatApiError(error, 'Failed to update inquiry.'),
     });
@@ -874,6 +953,7 @@ app.delete('/api/admin/inquiries/:id', requireAuth, async (req: AuthRequest, res
     }
     res.json({ deleted: true, id });
   } catch (error: unknown) {
+    console.error('DELETE /api/admin/inquiries/:id error:', error);
     res.status(500).json({
       error: formatApiError(error, 'Failed to delete inquiry.'),
     });
@@ -926,6 +1006,7 @@ app.patch(
       }
       res.json(updated);
     } catch (error: unknown) {
+      console.error('PATCH /api/admin/settings/:id error:', error);
       res.status(500).json({
         error: formatApiError(error, 'Failed to update settings.'),
       });
@@ -950,9 +1031,28 @@ app.patch(
       }
       res.json(updated);
     } catch (error: unknown) {
+      console.error('PATCH /api/admin/users/:id/role error:', error);
       res.status(500).json({
         error: formatApiError(error, 'Failed to update user role.'),
       });
     }
+  }
+);
+
+// Global Express error handler so middleware errors return structured JSON instead of crashing
+app.use(
+  (
+    err: unknown,
+    req: express.Request,
+    res: express.Response,
+    _next: express.NextFunction
+  ) => {
+    console.error(`Unhandled Express error on ${req.method} ${req.originalUrl}:`, err);
+    if (res.headersSent) {
+      return;
+    }
+    res.status(500).json({
+      error: formatApiError(err, 'Internal server error.'),
+    });
   }
 );
