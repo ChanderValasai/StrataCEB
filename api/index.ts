@@ -1,5 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'http';
-import { app } from '../src/server/app.ts';
+
+type ExpressApp = typeof import('../src/server/app.js').app;
+let cachedApp: ExpressApp | null = null;
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) {
@@ -19,6 +21,12 @@ export default async function handler(
   res: ServerResponse
 ): Promise<void> {
   try {
+    if (!cachedApp) {
+      const mod = await import('../src/server/app.js');
+      cachedApp = mod.app;
+    }
+    const app = cachedApp;
+
     await new Promise<void>((resolve) => {
       let settled = false;
       const done = () => {

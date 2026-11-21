@@ -1,5 +1,5 @@
 import { count } from 'drizzle-orm';
-import { db } from './index.ts';
+import { db } from './index.js';
 import {
   faqs,
   galleryItems,
@@ -12,7 +12,7 @@ import {
   qualityTests,
   rawMaterials,
   siteSettings,
-} from './schema.ts';
+} from './schema.js';
 
 let seedPromise: Promise<void> | null = null;
 

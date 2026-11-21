@@ -1,6 +1,6 @@
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { Pool, type PoolConfig } from 'pg';
-import * as schema from './schema.ts';
+import * as schema from './schema.js';
 
 declare global {
   var _postgresPool: Pool | undefined;

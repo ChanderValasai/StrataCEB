@@ -1,5 +1,5 @@
 import { asc, desc, eq } from 'drizzle-orm';
-import { db } from './index.ts';
+import { db } from './index.js';
 import {
   faqs,
   galleryItems,
@@ -14,8 +14,8 @@ import {
   rawMaterials,
   siteSettings,
   users,
-} from './schema.ts';
-import { ensureSeeded } from './seed.ts';
+} from './schema.js';
+import { ensureSeeded } from './seed.js';
 
 function dbError(message: string, error: unknown): Error {
   console.error(message, error);

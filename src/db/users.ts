@@ -1,6 +1,6 @@
 import { count, eq } from 'drizzle-orm';
-import { db } from './index.ts';
-import { users } from './schema.ts';
+import { db } from './index.js';
+import { users } from './schema.js';
 
 const OWNER_EMAILS = new Set([
   'valasaict582@gmail.com',

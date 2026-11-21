@@ -3,7 +3,7 @@ import {
   assertDatabaseConfigured,
   checkDatabaseHealth,
   getDatabaseConnectionMetadata,
-} from '../db/index.ts';
+} from '../db/index.js';
 import {
   createFaqRecord,
   createGalleryRecord,
@@ -28,10 +28,14 @@ import {
   updateProductRecord,
   updateProjectRecord,
   updateSiteSettingsRecord,
-} from '../db/queries.ts';
-import { updateUserRole } from '../db/users.ts';
-import { buildJsonLdGraph, buildSeoMetadata, SEO_DEFAULTS } from '../lib/seo.ts';
-import { AuthRequest, requireAdminRole, requireAuth } from '../middleware/auth.ts';
+} from '../db/queries.js';
+import { updateUserRole } from '../db/users.js';
+import { buildJsonLdGraph, buildSeoMetadata, SEO_DEFAULTS } from '../lib/seo.js';
+import {
+  type AuthRequest,
+  requireAdminRole,
+  requireAuth,
+} from '../middleware/auth.js';
 
 export const app = express();
 app.set('trust proxy', 1);

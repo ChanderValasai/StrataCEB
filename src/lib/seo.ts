@@ -1,4 +1,4 @@
-import type { PublicSiteBundle } from '../types/limestone';
+import type { PublicSiteBundle } from '../types/limestone.js';
 
 export const SEO_DEFAULTS = {
   siteName: 'Lime Stone (Eco-Earth Block)',
