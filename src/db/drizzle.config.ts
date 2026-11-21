@@ -7,6 +7,14 @@ const databaseUrl = process.env.DATABASE_URL?.trim();
 
 function resolveCredentials() {
   if (databaseUrl) {
+    const isLocal =
+      databaseUrl.includes('localhost') ||
+      databaseUrl.includes('127.0.0.1') ||
+      process.env.DATABASE_SSL?.trim().toLowerCase() === 'false';
+    if (isLocal && !databaseUrl.includes('sslmode=')) {
+      const sep = databaseUrl.includes('?') ? '&' : '?';
+      return { url: `${databaseUrl}${sep}sslmode=disable` };
+    }
     return { url: databaseUrl };
   }
 

@@ -2,6 +2,7 @@ import express from 'express';
 import {
   assertDatabaseConfigured,
   checkDatabaseHealth,
+  getDatabaseConnectionMetadata,
 } from '../db/index.ts';
 import {
   createFaqRecord,
@@ -234,11 +235,7 @@ function slugify(value: string): string {
 
 // Health endpoint with live PostgreSQL and schema check
 app.get('/api/health', async (_req, res) => {
-  const mode = process.env.DATABASE_URL
-    ? 'database_url'
-    : process.env.SQL_HOST
-      ? 'cloudsql_env'
-      : 'unconfigured';
+  const meta = getDatabaseConnectionMetadata();
 
   try {
     const health = await checkDatabaseHealth();
@@ -251,7 +248,10 @@ app.get('/api/health', async (_req, res) => {
       console.error('GET /api/health failed:', message);
       return res.status(500).json({
         status: 'error',
-        databaseMode: mode,
+        databaseMode: meta.mode,
+        isLocal: meta.isLocal,
+        sslEnabled: meta.sslEnabled,
+        poolMax: meta.poolMax,
         databaseConnected: health.connected,
         schemaReady: health.schemaReady,
         error: message,
@@ -260,7 +260,10 @@ app.get('/api/health', async (_req, res) => {
 
     return res.json({
       status: 'ok',
-      databaseMode: mode,
+      databaseMode: meta.mode,
+      isLocal: meta.isLocal,
+      sslEnabled: meta.sslEnabled,
+      poolMax: meta.poolMax,
       databaseConnected: true,
       schemaReady: true,
     });
@@ -268,7 +271,10 @@ app.get('/api/health', async (_req, res) => {
     console.error('GET /api/health unexpected error:', error);
     return res.status(500).json({
       status: 'error',
-      databaseMode: mode,
+      databaseMode: meta.mode,
+      isLocal: meta.isLocal,
+      sslEnabled: meta.sslEnabled,
+      poolMax: meta.poolMax,
       databaseConnected: false,
       schemaReady: false,
       error: formatApiError(error, 'Database health check failed.'),

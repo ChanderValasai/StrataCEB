@@ -165,9 +165,15 @@ CREATE TABLE IF NOT EXISTS site_settings (
 -- ============================================================================
 
 INSERT INTO users (uid, email, display_name, role)
-VALUES
-  ('seed-admin-ganpat', 'raiganpat401@gmail.com', 'Ganpat Meghwar', 'admin'),
-  ('seed-admin-owner', 'valasaict582@gmail.com', 'Site Owner', 'admin')
+SELECT v.uid, v.email, v.display_name, v.role
+FROM (
+  VALUES
+    ('seed-admin-ganpat', 'raiganpat401@gmail.com', 'Ganpat Meghwar', 'admin'),
+    ('seed-admin-owner', 'valasaict582@gmail.com', 'Site Owner', 'admin')
+) AS v(uid, email, display_name, role)
+WHERE NOT EXISTS (
+  SELECT 1 FROM users u WHERE lower(u.email) = lower(v.email)
+)
 ON CONFLICT (uid) DO NOTHING;
 
 -- ============================================================================
