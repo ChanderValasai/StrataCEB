@@ -1,10 +1,12 @@
 import type { NextFunction, Request, Response } from 'express';
-import type { DecodedIdToken } from 'firebase-admin/auth';
-import { getAdminAuth } from '../lib/firebase-admin.js';
+import {
+  verifyFirebaseIdToken,
+  type VerifiedFirebaseUser,
+} from '../lib/firebase-admin.js';
 import { getOrCreateUser } from '../db/users.js';
 
 export interface AuthRequest extends Request {
-  user?: DecodedIdToken;
+  user?: VerifiedFirebaseUser;
   dbUser?: {
     id: number;
     uid: string;
@@ -26,7 +28,7 @@ export const requireAuth = async (
 
   const token = authHeader.split('Bearer ')[1];
   try {
-    const decodedToken = await getAdminAuth().verifyIdToken(token);
+    const decodedToken = await verifyFirebaseIdToken(token);
     req.user = decodedToken;
 
     const dbUser = await getOrCreateUser(
